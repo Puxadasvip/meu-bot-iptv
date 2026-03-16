@@ -40,26 +40,36 @@ client.on('qr', (qr) => {
 client.on('ready', () => {
     console.log('🚀 BOT LEO IPTV ONLINE NO TERMUX!');
 
-    // Verificação automática de vencimento (roda a cada 24 horas)
+    // Verificação programada para as 09:00 da manhã
     setInterval(async () => {
-        try {
-            const db = JSON.parse(fs.readFileSync(BANCO_DADOS));
-            const hoje = new Date();
-            hoje.setHours(0,0,0,0);
+        const agora = new Date();
+        const hora = agora.getHours();
+        const minuto = agora.getMinutes();
 
-            for (const [id, info] of Object.entries(db)) {
-                if (!info.vencimento) continue;
-                const venc = new Date(info.vencimento + 'T00:00:00');
-                const diffDias = Math.ceil((venc - hoje) / (1000 * 60 * 60 * 24));
+        // Dispara exatamente às 09:00
+        if (hora === 9 && minuto === 0) {
+            console.log('⏰ Horário de avisos atingido (09:00). Verificando vencimentos...');
+            try {
+                const db = JSON.parse(fs.readFileSync(BANCO_DADOS));
+                const hoje = new Date();
+                hoje.setHours(0,0,0,0);
 
-                if (diffDias === 2) {
-                    await client.sendMessage(id, `⚠️ *AVISO DE VENCIMENTO*\n\nOlá! Sua assinatura vence em *2 dias*. Não fique sem sinal! Digite *6* para renovar.`);
-                } else if (diffDias === 0) {
-                    await client.sendMessage(id, `🚫 *VENCIMENTO HOJE*\n\nSua assinatura vence hoje. Para renovar, digite *6* e envie o comprovante!`);
+                for (const [id, info] of Object.entries(db)) {
+                    if (!info.vencimento) continue;
+                    const venc = new Date(info.vencimento + 'T00:00:00');
+                    const diffDias = Math.ceil((venc - hoje) / (1000 * 60 * 60 * 24));
+
+                    if (diffDias === 2) {
+                        await client.sendMessage(id, `⚠️ *AVISO DE VENCIMENTO*\n\nOlá! Sua assinatura vence em *2 dias*. Não fique sem sinal! Digite *6* para renovar.`);
+                        console.log(`✅ Aviso de 2 dias enviado para: ${info.nome}`);
+                    } else if (diffDias === 0) {
+                        await client.sendMessage(id, `🚫 *VENCIMENTO HOJE*\n\nSua assinatura vence hoje. Para renovar, digite *6* e envie o comprovante!`);
+                        console.log(`✅ Aviso de vencimento hoje enviado para: ${info.nome}`);
+                    }
                 }
-            }
-        } catch (e) { console.error("Erro no intervalo:", e.message); }
-    }, 1000 * 60 * 60 * 24);
+            } catch (e) { console.error("Erro no processamento das 09h:", e.message); }
+        }
+    }, 60000); // Checa o relógio a cada 1 minuto
 });
 
 client.on('message_create', async (msg) => {
@@ -73,13 +83,24 @@ client.on('message_create', async (msg) => {
         const texto = msg.body ? msg.body.toLowerCase() : '';
         const msgDe = msg.from;
 
+        // --- NOVO: MENU DE ADMINISTRADOR ---
+        if (texto === '!adm') {
+            if (!msg.fromMe) return;
+            const menuAdm = `🛠️ *MENU ADMINISTRADOR LEO IPTV*\n\n` +
+                `1️⃣ *!pago [dias]*\nEx: !pago 30 (Registra 30 dias de acesso no contato atual).\n\n` +
+                `2️⃣ *!vencimentos*\nLista todos os clientes e status (Ativo/Vencido).\n\n` +
+                `3️⃣ *!remover*\nRemove o cliente atual do sistema de avisos.\n\n` +
+                `4️⃣ *!status*\nTesta se o bot está respondendo.`;
+            await client.sendMessage(msg.from, menuAdm);
+            return;
+        }
+
         // --- COMANDO PARA REGISTRAR PAGAMENTO (NOME REAL E NÚMERO LIMPO) ---
         if (texto.startsWith('!pago ')) {
             if (!msg.fromMe) return;
             const dias = parseInt(texto.split(' ')[1]);
             if (isNaN(dias)) return;
 
-            // Busca o contato para pegar o nome do perfil (pushname)
             const contatoAlvo = await chat.getContact();
             const nomeReal = contatoAlvo.pushname || 'Cliente';
 
@@ -125,7 +146,6 @@ client.on('message_create', async (msg) => {
                     status = '🟢 *ATIVO*';
                 }
 
-                // Limpa o ID para mostrar apenas o número de telefone
                 const numeroExibir = id.split('@')[0].replace(/[^0-9]/g, '');
 
                 lista += `👤 *Nome:* ${cliente.nome}\n`;
@@ -208,3 +228,4 @@ client.on('message_create', async (msg) => {
 });
 
 client.initialize();
+
