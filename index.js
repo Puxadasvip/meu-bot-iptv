@@ -10,6 +10,9 @@ const MINHA_CHAVE_PIX = '35998632886';
 const NOME_PIX = 'Jose Leandro Silva Cardoso';
 const BANCO_DADOS = './clientes.json';
 
+// Estado do servidor (Manutenção)
+let manutencaoAtiva = false;
+
 if (!fs.existsSync(BANCO_DADOS)) {
     fs.writeFileSync(BANCO_DADOS, JSON.stringify({}));
 }
@@ -40,15 +43,15 @@ client.on('qr', (qr) => {
 client.on('ready', () => {
     console.log('🚀 BOT LEO IPTV ONLINE NO TERMUX!');
 
-    // Verificação programada para as 09:00 da manhã
+    // Verificação programada
     setInterval(async () => {
         const agora = new Date();
         const hora = agora.getHours();
         const minuto = agora.getMinutes();
 
-        // Dispara exatamente às 09:00
+        // --- DISPARO DAS 09:00 (AVISOS NORMAIS) ---
         if (hora === 9 && minuto === 0) {
-            console.log('⏰ Horário de avisos atingido (09:00). Verificando vencimentos...');
+            console.log('⏰ Horário de avisos atingido (09:00).');
             try {
                 const db = JSON.parse(fs.readFileSync(BANCO_DADOS));
                 const hoje = new Date();
@@ -61,15 +64,33 @@ client.on('ready', () => {
 
                     if (diffDias === 2) {
                         await client.sendMessage(id, `⚠️ *AVISO DE VENCIMENTO*\n\nOlá! Sua assinatura vence em *2 dias*. Não fique sem sinal! Digite *6* para renovar.`);
-                        console.log(`✅ Aviso de 2 dias enviado para: ${info.nome}`);
                     } else if (diffDias === 0) {
                         await client.sendMessage(id, `🚫 *VENCIMENTO HOJE*\n\nSua assinatura vence hoje. Para renovar, digite *6* e envie o comprovante!`);
-                        console.log(`✅ Aviso de vencimento hoje enviado para: ${info.nome}`);
                     }
                 }
-            } catch (e) { console.error("Erro no processamento das 09h:", e.message); }
+            } catch (e) { console.error("Erro nas 09h:", e.message); }
         }
-    }, 60000); // Checa o relógio a cada 1 minuto
+
+        // --- DISPARO DAS 18:00 (URGÊNCIA/BLOQUEIO SIMULADO) ---
+        if (hora === 18 && minuto === 0) {
+            console.log('⏰ Horário de urgência atingido (18:00).');
+            try {
+                const db = JSON.parse(fs.readFileSync(BANCO_DADOS));
+                const hoje = new Date();
+                hoje.setHours(0,0,0,0);
+
+                for (const [id, info] of Object.entries(db)) {
+                    if (!info.vencimento) continue;
+                    const venc = new Date(info.vencimento + 'T00:00:00');
+                    const diffDias = Math.ceil((venc - hoje) / (1000 * 60 * 60 * 24));
+
+                    if (diffDias === 0) {
+                        await client.sendMessage(id, `⚠️ *ALERTA DE BLOQUEIO*\n\nIdentificamos que sua renovação ainda não foi confirmada. Para evitar o corte automático do sinal às 20h, envie o comprovante agora!`);
+                    }
+                }
+            } catch (e) { console.error("Erro nas 18h:", e.message); }
+        }
+    }, 60000);
 });
 
 client.on('message_create', async (msg) => {
@@ -83,78 +104,82 @@ client.on('message_create', async (msg) => {
         const texto = msg.body ? msg.body.toLowerCase() : '';
         const msgDe = msg.from;
 
-        // --- NOVO: MENU DE ADMINISTRADOR ---
+        // Se o servidor estiver em manutenção, avisa o cliente (exceto se for o ADM)
+        if (manutencaoAtiva && !msg.fromMe && !usuariosSaudados.has(msgDe)) {
+            await msg.reply('⚠️ *COMUNICADO LEO IPTV*\n\nNosso servidor principal está em manutenção programada para melhorias. Previsão de retorno em 30-60 min. Agradecemos a paciência!');
+            return;
+        }
+
+        // --- MENU DE ADMINISTRADOR ---
         if (texto === '!adm') {
             if (!msg.fromMe) return;
-            const menuAdm = `🛠️ *MENU ADMINISTRADOR LEO IPTV*\n\n` +
-                `1️⃣ *!pago [dias]*\nEx: !pago 30 (Registra 30 dias de acesso no contato atual).\n\n` +
-                `2️⃣ *!vencimentos*\nLista todos os clientes e status (Ativo/Vencido).\n\n` +
-                `3️⃣ *!remover*\nRemove o cliente atual do sistema de avisos.\n\n` +
-                `4️⃣ *!status*\nTesta se o bot está respondendo.`;
+            const menuAdm = `🛠️ *MENU ADM LEO IPTV*\n\n` +
+                `1️⃣ *!pago [dias]* -> Ativa cliente.\n` +
+                `2️⃣ *!pago [dias] @numero* -> Ativa e dá +15 dias pro amigo.\n` +
+                `3️⃣ *!vencimentos* -> Relatório geral.\n` +
+                `4️⃣ *!manutencao on/off* -> Ativa aviso de queda.\n` +
+                `5️⃣ *!remover* -> Exclui cliente.`;
             await client.sendMessage(msg.from, menuAdm);
             return;
         }
 
-        // --- COMANDO PARA REGISTRAR PAGAMENTO (NOME REAL E NÚMERO LIMPO) ---
+        // --- COMANDO MANUTENÇÃO ---
+        if (texto.startsWith('!manutencao ')) {
+            if (!msg.fromMe) return;
+            const status = texto.split(' ')[1];
+            manutencaoAtiva = (status === 'on');
+            await msg.reply(`🔧 Modo manutenção: *${manutencaoAtiva ? 'ATIVADO' : 'DESATIVADO'}*`);
+            return;
+        }
+
+        // --- COMANDO !PAGO COM INDICAÇÃO ---
         if (texto.startsWith('!pago ')) {
             if (!msg.fromMe) return;
-            const dias = parseInt(texto.split(' ')[1]);
+            const partes = texto.split(' ');
+            const dias = parseInt(partes[1]);
             if (isNaN(dias)) return;
 
+            const db = JSON.parse(fs.readFileSync(BANCO_DADOS));
             const contatoAlvo = await chat.getContact();
             const nomeReal = contatoAlvo.pushname || 'Cliente';
 
             const vencimento = new Date();
             vencimento.setDate(vencimento.getDate() + dias);
-            const dataFormatada = vencimento.toISOString().split('T')[0];
+            db[msg.to] = { vencimento: vencimento.toISOString().split('T')[0], nome: nomeReal };
 
-            const db = JSON.parse(fs.readFileSync(BANCO_DADOS));
-            db[msg.to] = { 
-                vencimento: dataFormatada, 
-                nome: nomeReal 
-            };
+            let msgBonus = '';
+            // Se tiver indicação (ex: !pago 30 5535...)
+            if (partes[2]) {
+                const idIndicador = partes[2].replace('@', '') + '@c.us';
+                if (db[idIndicador]) {
+                    let dataBonus = new Date(db[idIndicador].vencimento + 'T00:00:00');
+                    dataBonus.setDate(dataBonus.getDate() + 15);
+                    db[idIndicador].vencimento = dataBonus.toISOString().split('T')[0];
+                    msgBonus = `\n\n🎁 *BÔNUS:* 15 dias de bônus creditados ao indicador!`;
+                }
+            }
+
             fs.writeFileSync(BANCO_DADOS, JSON.stringify(db, null, 2));
-
-            await client.sendMessage(msg.to, `✅ *RENOVAÇÃO REGISTRADA!*\n👤 *Cliente:* ${nomeReal}\n🗓️ *Vencimento:* ${vencimento.toLocaleDateString('pt-BR')}\nO bot avisará o cliente automaticamente.`);
+            await client.sendMessage(msg.to, `✅ *RENOVAÇÃO REGISTRADA!*\n🗓️ Vencimento: ${vencimento.toLocaleDateString('pt-BR')}${msgBonus}`);
             return;
         }
 
-        // --- COMANDO !VENCIMENTOS (LISTA COM STATUS E NÚMEROS LIMPOS) ---
+        // --- COMANDO !VENCIMENTOS ---
         if (texto === '!vencimentos') {
             if (!msg.fromMe) return;
             const db = JSON.parse(fs.readFileSync(BANCO_DADOS));
             const hoje = new Date();
             hoje.setHours(0, 0, 0, 0);
-
-            let lista = '*📊 GESTÃO DE CLIENTES IPTV*\n\n';
+            let lista = '*📊 GESTÃO DE CLIENTES*\n\n';
             const IDs = Object.keys(db);
-
-            if (IDs.length === 0) return msg.reply('❌ Nenhum cliente cadastrado.');
+            if (IDs.length === 0) return msg.reply('❌ Vazio.');
 
             IDs.forEach(id => {
                 const cliente = db[id];
-                if (!cliente.vencimento) return;
-                
                 const dataVenc = new Date(cliente.vencimento + 'T00:00:00');
-                let status = '';
-
-                if (dataVenc < hoje) {
-                    status = '🔴 *VENCIDO*';
-                } else if (dataVenc.getTime() === hoje.getTime()) {
-                    status = '🟡 *VENCE HOJE*';
-                } else {
-                    status = '🟢 *ATIVO*';
-                }
-
-                const numeroExibir = id.split('@')[0].replace(/[^0-9]/g, '');
-
-                lista += `👤 *Nome:* ${cliente.nome}\n`;
-                lista += `📱 *Zap:* ${numeroExibir}\n`;
-                lista += `📆 *Vencimento:* ${dataVenc.toLocaleDateString('pt-BR')}\n`;
-                lista += `📌 *Status:* ${status}\n`;
-                lista += `----------------------------\n`;
+                let status = (dataVenc < hoje) ? '🔴 *VENCIDO*' : (dataVenc.getTime() === hoje.getTime() ? '🟡 *HOJE*' : '🟢 *ATIVO*');
+                lista += `👤 ${cliente.nome}\n📱 ${id.split('@')[0]}\n📆 ${dataVenc.toLocaleDateString('pt-BR')}\n📌 ${status}\n---\n`;
             });
-
             await client.sendMessage(msg.from, lista);
             return;
         }
@@ -166,15 +191,12 @@ client.on('message_create', async (msg) => {
             if (db[msg.to]) {
                 delete db[msg.to];
                 fs.writeFileSync(BANCO_DADOS, JSON.stringify(db, null, 2));
-                await msg.reply("🗑️ Cliente removido do sistema!");
-            } else {
-                await msg.reply("❌ Cliente não encontrado.");
+                await msg.reply("🗑️ Removido!");
             }
             return;
         }
 
         if (msg.fromMe) return;
-
         const contato = await msg.getContact();
 
         const responderComDelay = async (mensagem) => {
@@ -190,42 +212,37 @@ client.on('message_create', async (msg) => {
         // --- BOAS-VINDAS ---
         if (!usuariosSaudados.has(msgDe)) {
             usuariosSaudados.add(msgDe);
-            await responderComDelay(`Olá! Bem-vindo ao suporte Leo IPTV. 🚀\nEscolha uma opção abaixo:\n\n1️⃣ - Horário de funcionamento\n2️⃣ - Falar com o suporte (Leo)\n3️⃣ - Ver o endereço da loja\n4️⃣ - Cupom de desconto\n5️⃣ - 🚀 SOLICITAR TESTE GRÁTIS\n6️⃣ - 💳 PAGAR VIA PIX / RENOVAR\n7️⃣ - 📺 VER PLANOS E PREÇOS\n8️⃣ - 📝 LISTA DE CANAIS\n9️⃣ - 🎁 GANHE MESES GRÁTIS`);
+            await responderComDelay(`Olá! Bem-vindo ao suporte Leo IPTV. 🚀\nEscolha uma opção:\n\n1️⃣ - Horário\n2️⃣ - Suporte\n3️⃣ - Endereço\n4️⃣ - Cupom\n5️⃣ - 🚀 TESTE GRÁTIS\n6️⃣ - 💳 RENOVAR/PIX\n7️⃣ - 📺 PLANOS\n8️⃣ - 📝 CANAIS\n9️⃣ - 🎁 GANHE BÔNUS`);
             return;
         }
 
-        // --- MENU E OPÇÕES ---
-        if (['menu', 'inicio', 'opções', 'voltar'].includes(texto)) {
-            await responderComDelay(`Escolha uma opção abaixo:\n\n1️⃣ - Horário de funcionamento\n2️⃣ - Falar com o suporte (Leo)\n3️⃣ - Ver o endereço da loja\n4️⃣ - Cupom de desconto\n5️⃣ - 🚀 SOLICITAR TESTE GRÁTIS\n6️⃣ - 💳 PAGAR VIA PIX / RENOVAR\n7️⃣ - 📺 VER PLANOS E PREÇOS\n8️⃣ - 📝 LISTA DE CANAIS\n9️⃣ - 🎁 GANHE MESES GRÁTIS`);
+        // --- OPÇÕES DO MENU ---
+        if (['menu', 'inicio', 'voltar'].includes(texto)) {
+            await responderComDelay(`Escolha uma opção:\n\n1️⃣ a 9️⃣`);
         }
-        else if (texto === '1') await responderComDelay('🕒 Atendimento de Segunda a Sexta, das 08h às 23h. Sábados das 09h às 18h.');
+        else if (texto === '1') await responderComDelay('🕒 Seg a Sex: 08h-23h.');
         else if (texto === '2') {
-            await responderComDelay('👨‍💻 Um momento! Já avisei o Leo. Ele falará com você em breve.');
-            await client.sendMessage(seuNumero, `📢 *ALERTA:* O cliente ${contato.number} solicitou suporte humano.`);
+            await responderComDelay('👨‍💻 Leo avisado!');
+            await client.sendMessage(seuNumero, `📢 Suporte: ${contato.number}`);
         }
-        else if (texto === '3') await responderComDelay('📍 Loja física: Rua Lazaro Gabriel De Oliveira, nº 1000, Osasco/SP.');
-        else if (texto === '4') await responderComDelay('🎁 Use o cupom LEOIPTV10 e ganhe 10% de desconto na primeira assinatura!');
+        else if (texto === '3') await responderComDelay('📍 Osasco/SP.');
+        else if (texto === '4') await responderComDelay('🎁 LEOIPTV10');
         else if (texto === '5' || texto === 'teste') {
-            await responderComDelay('⏳ GERANDO SEU TESTE...\nAguarde 10 segundos enquanto preparo seu acesso exclusivo! 🚀');
+            await responderComDelay('⏳ GERANDO TESTE...');
             try {
                 const response = await axios.post(API_TESTE, {}, { headers: { 'User-Agent': 'Mozilla/5.0' } });
                 if (response.data.reply) await client.sendMessage(msg.from, response.data.reply);
-            } catch (e) { await msg.reply('❌ Sistema de testes em manutenção. Digite 2 para suporte manual.'); }
+            } catch (e) { await msg.reply('❌ Erro no teste.'); }
         }
-        else if (texto === '6' || texto === 'pix' || texto === 'pagar' || texto === 'renovar') {
-            await responderComDelay(`💰 *PAGAMENTO VIA PIX*\n\n🔑 *CHAVE:* ${MINHA_CHAVE_PIX}\n👤 *NOME:* ${NOME_PIX}\n🏦 *BANCO:* Itaú\n\n📸 *Envie o comprovante aqui para liberar seu acesso!*`);
+        else if (texto === '6' || texto === 'pix') {
+            await responderComDelay(`💰 *PIX:* ${MINHA_CHAVE_PIX}\n${NOME_PIX}`);
         }
-        else if (texto === '7' || texto === 'planos') {
-            await responderComDelay(`📺 NOSSOS PLANOS IPTV 📺\n\n✅ MENSAL: R$ 25,00\n✅ TRIMESTRAL: R$ 60,00\n✅ SEMESTRAL: R$ 110,00\n\n🚀 +40.000 Conteúdos\n🎥 Filmes e Séries\nOpção 6 para pagar.`);
-        }
-        else if (texto === '8' || texto === 'canais') {
-            await responderComDelay(`📺 TODOS OS CANAIS LIBERADOS!\nEsportes, Filmes, HBO, Premiere e muito mais. Peça um teste (opção 5).`);
-        }
-        else if (texto === '9') await responderComDelay(`🎁 INDIQUE UM AMIGO!\nSe ele assinar, você ganha 15 dias de bônus.`);
-        else if (texto === '!status') await msg.reply('✅ Bot Leo IPTV está Ativo!');
+        else if (texto === '7') await responderComDelay(`📺 PLANOS: Mensal R$25, Trimestral R$60.`);
+        else if (texto === '8') await responderComDelay(`📺 +40 mil conteúdos liberados!`);
+        else if (texto === '9') await responderComDelay(`🎁 Indique um amigo e ganhe 15 dias de bônus quando ele assinar!`);
+        else if (texto === '!status') await msg.reply('✅ On!');
 
-    } catch (error) { console.error('Erro no processamento:', error.message); }
+    } catch (error) { console.error('Erro:', error.message); }
 });
 
 client.initialize();
-
