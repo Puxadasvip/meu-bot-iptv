@@ -110,16 +110,34 @@ client.on('message_create', async (msg) => {
             return;
         }
 
+        // --- COMANDO RÁPIDO PARA CHAVE PIX ---
+        if (texto === '!chave') {
+            await msg.reply(`💰 *MINHA CHAVE PIX*\n\n🔑 \`${MINHA_CHAVE_PIX}\`\n👤 *Nome:* ${NOME_PIX}\n\n*(Toque na chave para copiar)*`);
+            return;
+        }
+
         // --- MENU DE ADMINISTRADOR ---
         if (texto === '!adm') {
             if (!msg.fromMe) return;
             const menuAdm = `🛠️ *MENU ADM LEO IPTV*\n\n` +
                 `1️⃣ *!pago [dias]* -> Ativa cliente.\n` +
-                `2️⃣ *!pago [dias] @numero* -> Ativa e dá +15 dias pro amigo.\n` +
-                `3️⃣ *!vencimentos* -> Relatório geral.\n` +
-                `4️⃣ *!manutencao on/off* -> Ativa aviso de queda.\n` +
-                `5️⃣ *!remover* -> Exclui cliente.`;
+                `2️⃣ *!pago [dias] @numero* -> Ativa e dá bônus.\n` +
+                `3️⃣ *!vencimentos* -> Lista Geral.\n` +
+                `4️⃣ *!caixa* -> Vendas do mês.\n` +
+                `5️⃣ *!manutencao on/off* -> Aviso de queda.\n` +
+                `6️⃣ *!remover* -> Exclui cliente.\n` +
+                `7️⃣ *!pix* -> minha chave pix.`;
             await client.sendMessage(msg.from, menuAdm);
+            return;
+        }
+
+        // --- COMANDO !CAIXA (RELATÓRIO FINANCEIRO) ---
+        if (texto === '!caixa') {
+            if (!msg.fromMe) return;
+            const db = JSON.parse(fs.readFileSync(BANCO_DADOS));
+            const IDs = Object.keys(db);
+            const total = IDs.length;
+            await msg.reply(`💰 *RELATÓRIO FINANCEIRO RÁPIDO*\n\n👥 Clientes na base: ${total}\n✅ Total estimado: R$ ${total * 25},00\n\n*(Cálculo baseado no plano mensal de R$ 25)*`);
             return;
         }
 
@@ -132,7 +150,7 @@ client.on('message_create', async (msg) => {
             return;
         }
 
-        // --- COMANDO !PAGO COM INDICAÇÃO ---
+        // --- COMANDO !PAGO COM INDICAÇÃO E PÓS-VENDA ---
         if (texto.startsWith('!pago ')) {
             if (!msg.fromMe) return;
             const partes = texto.split(' ');
@@ -148,19 +166,18 @@ client.on('message_create', async (msg) => {
             db[msg.to] = { vencimento: vencimento.toISOString().split('T')[0], nome: nomeReal };
 
             let msgBonus = '';
-            // Se tiver indicação (ex: !pago 30 5535...)
             if (partes[2]) {
                 const idIndicador = partes[2].replace('@', '') + '@c.us';
                 if (db[idIndicador]) {
                     let dataBonus = new Date(db[idIndicador].vencimento + 'T00:00:00');
                     dataBonus.setDate(dataBonus.getDate() + 15);
                     db[idIndicador].vencimento = dataBonus.toISOString().split('T')[0];
-                    msgBonus = `\n\n🎁 *BÔNUS:* 15 dias de bônus creditados ao indicador!`;
+                    msgBonus = `\n\n🎁 *BÔNUS:* 15 dias creditados ao indicador!`;
                 }
             }
 
             fs.writeFileSync(BANCO_DADOS, JSON.stringify(db, null, 2));
-            await client.sendMessage(msg.to, `✅ *RENOVAÇÃO REGISTRADA!*\n🗓️ Vencimento: ${vencimento.toLocaleDateString('pt-BR')}${msgBonus}`);
+            await client.sendMessage(msg.to, `✅ *RENOVAÇÃO REGISTRADA!*\n🗓️ Vencimento: ${vencimento.toLocaleDateString('pt-BR')}${msgBonus}\n\n📺 *Obrigado pela confiança! Bom divertimento!*`);
             return;
         }
 
@@ -191,7 +208,7 @@ client.on('message_create', async (msg) => {
             if (db[msg.to]) {
                 delete db[msg.to];
                 fs.writeFileSync(BANCO_DADOS, JSON.stringify(db, null, 2));
-                await msg.reply("🗑️ Removido!");
+                await msg.reply("🗑️Cliente removido do sistema de avisos!");
             }
             return;
         }
@@ -209,38 +226,40 @@ client.on('message_create', async (msg) => {
             });
         };
 
+        const MENU_PADRAO = `Olá! Bem-vindo ao suporte *Leo IPTV*. 🚀\nEscolha uma opção abaixo para continuar:\n\n1️⃣ - 🕗 Horário de funcionamento\n2️⃣ - 🤵🏻 Falar com o suporte (Leo)\n3️⃣ - 🏠 Ver o endereço da loja\n4️⃣ - 🔖 Cupom de desconto\n5️⃣ - 🚀 SOLICITAR TESTE GRÁTIS\n6️⃣ - 💳 PAGAR VIA PIX / RENOVAR\n7️⃣ - 📺 VER PLANOS E PREÇOS\n8️⃣ - 📝 LISTA DE CANAIS\n9️⃣ - 🎁 GANHE MESES GRÁTIS`;
+
         // --- BOAS-VINDAS ---
         if (!usuariosSaudados.has(msgDe)) {
             usuariosSaudados.add(msgDe);
-            await responderComDelay(`Olá! Bem-vindo ao suporte Leo IPTV. 🚀\nEscolha uma opção:\n\n1️⃣ - Horário\n2️⃣ - Suporte\n3️⃣ - Endereço\n4️⃣ - Cupom\n5️⃣ - 🚀 TESTE GRÁTIS\n6️⃣ - 💳 RENOVAR/PIX\n7️⃣ - 📺 PLANOS\n8️⃣ - 📝 CANAIS\n9️⃣ - 🎁 GANHE BÔNUS`);
+            await responderComDelay(MENU_PADRAO);
             return;
         }
 
         // --- OPÇÕES DO MENU ---
         if (['menu', 'inicio', 'voltar'].includes(texto)) {
-            await responderComDelay(`Escolha uma opção:\n\n1️⃣ a 9️⃣`);
+            await responderComDelay(MENU_PADRAO);
         }
-        else if (texto === '1') await responderComDelay('🕒 Seg a Sex: 08h-23h.');
+        else if (texto === '1') await responderComDelay('1️⃣ 🕒 Atendimento de Segunda a Sexta, das 08h às 23h. Sábados das 09h às 18h.');
         else if (texto === '2') {
-            await responderComDelay('👨‍💻 Leo avisado!');
-            await client.sendMessage(seuNumero, `📢 Suporte: ${contato.number}`);
+            await responderComDelay('2️⃣ 👨‍💻 Um momento! Já avisei o Leo. Ele falará com você em breve.');
+            await client.sendMessage(seuNumero, `📢 *ALERTA:* O cliente ${contato.number} solicitou suporte humano.`);
         }
-        else if (texto === '3') await responderComDelay('📍 Osasco/SP.');
-        else if (texto === '4') await responderComDelay('🎁 LEOIPTV10');
+        else if (texto === '3') await responderComDelay('3️⃣ 📍 Loja física: Rua Lazaro Gabriel De Oliveira, nº 1000, Osasco/SP.');
+        else if (texto === '4') await responderComDelay('4️⃣ 🎁 Use o cupom *LEOIPTV10* e ganhe 10% de desconto na primeira assinatura!');
         else if (texto === '5' || texto === 'teste') {
-            await responderComDelay('⏳ GERANDO TESTE...');
+            await responderComDelay('⏳ GERANDO SEU TESTE...\nAguarde 10 segundos enquanto preparo seu acesso exclusivo! 🚀');
             try {
                 const response = await axios.post(API_TESTE, {}, { headers: { 'User-Agent': 'Mozilla/5.0' } });
                 if (response.data.reply) await client.sendMessage(msg.from, response.data.reply);
-            } catch (e) { await msg.reply('❌ Erro no teste.'); }
+            } catch (e) { await msg.reply('❌ Sistema de testes em manutenção. Digite 2 para suporte manual.'); }
         }
         else if (texto === '6' || texto === 'pix') {
-            await responderComDelay(`💰 *PIX:* ${MINHA_CHAVE_PIX}\n${NOME_PIX}`);
+            await responderComDelay(`6️⃣ 💰 *PAGAMENTO VIA PIX*\n\n🔑 *CHAVE:* 35998632886\n👤 *NOME:* Jose Leandro Silva Cardoso\n🏦 *BANCO:* Itaú\n\n📸 *Envie o comprovante aqui para liberar seu acesso!*`);
         }
-        else if (texto === '7') await responderComDelay(`📺 PLANOS: Mensal R$25, Trimestral R$60.`);
-        else if (texto === '8') await responderComDelay(`📺 +40 mil conteúdos liberados!`);
-        else if (texto === '9') await responderComDelay(`🎁 Indique um amigo e ganhe 15 dias de bônus quando ele assinar!`);
-        else if (texto === '!status') await msg.reply('✅ On!');
+        else if (texto === '7') await responderComDelay(`📺 *NOSSOS PLANOS IPTV* 📺\n\nEscolha seu plano e digita (opção 6) para efetuar o pagamento.\n\n✅ *MENSAL:* R$ 25,00\n✅ *TRIMESTRAL:* R$ 60,00 (Economize R$ 15!)\n✅ *SEMESTRAL:* R$ 110,00\n\n🚀 +40.000 Conteúdos (4K, Full HD e HD)\n🎥 Filmes, Séries e Canais Adultos (Opcional)\n📱 Assista na Smart TV, Celular, TV Box ou PC.`);
+        else if (texto === '8') await responderComDelay(`8️⃣ 📺 *NOSSA GRADE DE CONTEÚDO:*\n\n✅ Todos os canais de Esportes (Premiere, DAZN, ESPN)\n✅ Todos os canais de Filmes (HBO, Telecine, Max)\n✅ Canais Abertos e Fechados em 4K e Full HD\n✅ +30.000 Filmes e Séries (Netflix, Disney+, Globoplay)\n✅ Conteúdo Kids completo\n🔞 Canais Adultos (Opcional com senha)\n\n*Peça um teste grátis (opção 5) para ver a qualidade!*`);
+        else if (texto === '9') await responderComDelay(`9️⃣ 🎁 *QUER GANHAR MENSALIDADE GRÁTIS?*\n\nIndique um amigo! Se ele assinar qualquer plano, você ganha *15 dias de bônus* na sua assinatura atual.\n\nQuanto mais indicar, mais tempo você assiste de graça! 🚀`);
+        else if (texto === '!status') await msg.reply('✅ Bot Leo IPTV está Ativo!');
 
     } catch (error) { console.error('Erro:', error.message); }
 });
