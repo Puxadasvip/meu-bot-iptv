@@ -271,10 +271,24 @@ client.on('message_create', async (msg) => {
         else if (texto === '3') await responderComDelay('3️⃣ 📍 Loja física: Rua Lazaro Gabriel De Oliveira, nº 1000, Osasco/SP.');
         else if (texto === '4') await responderComDelay('4️⃣ 🎁 Use o cupom LEOIPTV10 e ganhe 10% de desconto!');
         else if (texto === '5' || texto === 'teste') {
-            await responderComDelay('⏳ GERANDO SEU TESTE...');
+            await responderComDelay('⏳ *GERANDO SEU TESTE GRÁTIS...*');
             try {
                 const response = await axios.post(API_TESTE, {}, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-                if (response.data.reply) await client.sendMessage(msg.from, response.data.reply);
+                
+                if (response.data.reply) {
+                    await client.sendMessage(msg.from, response.data.reply);
+                    await client.sendMessage(msg.from, '✅ *Teste gerado com sucesso!* Você tem 3 horas para aproveitar o melhor conteúdo.\n\nAssista no celular, TV ou PC! 🚀');
+
+                    // --- CONTADOR DE TESTE AUTOMÁTICO (REMARKETING) ---
+                    const tresHoras = 3 * 60 * 60 * 1000; 
+
+                    setTimeout(async () => {
+                        try {
+                            const mensagemPosTeste = `👋 Olá! Vi aqui que o seu teste de 3 horas já expirou.\n\n*Gostou da qualidade?*\n\nNão fique sem sinal! Digite *6* para escolher um plano e ativar o seu acesso VIP agora mesmo e ganhe mais 5 dias a mais Extras na sua assinatura! 💎`;
+                            await client.sendMessage(msg.from, mensagemPosTeste);
+                        } catch (err) { console.error('Erro no contador:', err.message); }
+                    }, tresHoras);
+                }
             } catch (e) { await msg.reply('❌ Sistema de testes em manutenção.'); }
         }
         else if (texto === '6' || texto === 'pix') {
