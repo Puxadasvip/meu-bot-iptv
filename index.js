@@ -9,6 +9,7 @@ const API_TESTE = 'https://atmos.panelbr.site/api/chatbot/VdWXYPj13q/VpKDaPJLRA'
 const MINHA_CHAVE_PIX = '35998632886';
 const NOME_PIX = 'Jose Leandro Silva Cardoso';
 const BANCO_DADOS = './clientes.json';
+const LINK_APP = 'https://xciptv.br.uptodown.com/android/download'; // <--- INSIRA O LINK DO SEU APP AQUI
 
 let manutencaoAtiva = false;
 
@@ -118,7 +119,7 @@ client.on('message_create', async (msg) => {
         }
 
         if (texto === '!chave') {
-            await msg.reply(`💰 *MINHA CHAVE PIX*\n\n🔑 \`${MINHA_CHAVE_PIX}\`\n👤 *Nome:* ${NOME_PIX}\n\n*(Toque na chave para copiar)*`);
+            await msg.reply(`💰 *MINHA CHAVE PIX*\n\n 🔑 \`${MINHA_CHAVE_PIX}\`\n👤 *Nome:* ${NOME_PIX}\n\n*(Toque na chave para copiar)*`);
             return;
         }
 
@@ -132,21 +133,35 @@ client.on('message_create', async (msg) => {
                 `5️⃣ *!aviso [mensagem]* -> Transmissão p/ todos.\n` +
                 `6️⃣ *!manutencao on/off* -> Aviso de queda.\n` +
                 `7️⃣ *!remover* -> Exclui cliente.\n` +
-                `8️⃣ *!pix* -> Minha chave pix.`;
+                `8️⃣ *!pix* -> Minha chave pix.\n` +
+                `9️⃣ *!tutorial* -> Envia guia de instalação.`;
             await client.sendMessage(msg.from, menuAdm);
+            return;
+        }
+
+        if (texto === '!tutorial') {
+            const guiaSuporte = `📖 *GUIA DE INSTALAÇÃO - LEO IPTV* 📺\n\n` +
+                `Siga os passos abaixo para configurar seu acesso:\n\n` +
+                `1️⃣ *BAIXE O APP:* Procure por "IPTV Smarters" ou "XCIPTV" na sua loja de aplicativos.\n\n` +
+                `2️⃣ *DADOS DE ACESSO:* Use o Usuário e Senha que o bot enviou no seu teste.\n\n` +
+                `3️⃣ *DNS / URL:* Se o app pedir, use esta:\n` +
+                `🌐 \`http://yuzantor.online:80\`\n\n` +
+                `⚠️ *DICA:* Se travar, reinicie seu modem. Recomendamos internet acima de 20 Mega.\n\n` +
+                `🎥 *VÍDEO PASSO A PASSO:* Solicite ao Leo o link do vídeo!`;
+            await client.sendMessage(msg.from, guiaSuporte);
             return;
         }
 
         if (texto.startsWith('!aviso ')) {
             if (!msg.fromMe) return;
-            const comunicado = msg.body.slice(7); 
+            const comunicado = msg.body.slice(7);
             const db = JSON.parse(fs.readFileSync(BANCO_DADOS));
             const clientes = Object.keys(db);
 
             if (clientes.length === 0) return msg.reply('❌ Nenhum cliente na base.');
 
             await msg.reply(`📢 Iniciando envio para ${clientes.length} clientes...`);
-            
+
             for (const id of clientes) {
                 try {
                     await client.sendMessage(id, `📢 *COMUNICADO IMPORTANTE*\n\n${comunicado}`);
@@ -187,7 +202,7 @@ client.on('message_create', async (msg) => {
             const vencDate = new Date();
             vencDate.setDate(vencDate.getDate() + dias);
             const vencFormatado = vencDate.toLocaleDateString('pt-BR');
-            
+
             db[msg.to] = { vencimento: vencDate.toISOString().split('T')[0], nome: nomeReal };
 
             let msgBonusTxt = '';
@@ -252,7 +267,7 @@ client.on('message_create', async (msg) => {
             });
         };
 
-        const MENU_PADRAO = `Olá! Bem-vindo ao suporte *Leo IPTV*. 🚀\nEscolha uma opção abaixo para continuar:\n\n1️⃣ - 🕗 Horário de funcionamento\n2️⃣ - 🤵🏻 Falar com o suporte (Leo)\n3️⃣ - 🏠 Ver o endereço da loja\n4️⃣ - 🔖 Cupom de desconto\n5️⃣ - 🚀 SOLICITAR TESTE GRÁTIS\n6️⃣ - 💳 PAGAR VIA PIX / RENOVAR\n7️⃣ - 📺 VER PLANOS E PREÇOS\n8️⃣ - 📝 LISTA DE CANAIS\n9️⃣ - 🎁 GANHE MESES GRÁTIS`;
+        const MENU_PADRAO = `Olá! Bem-vindo ao suporte *Leo IPTV*. 🚀\nEscolha uma opção abaixo para continuar:\n\n1️⃣ - 🕗 Horário de funcionamento\n2️⃣ - 🤵🏻 Falar com o suporte (Leo)\n3️⃣ - 🏠 Ver o endereço da loja\n4️⃣ - 🔖 Cupom de desconto\n5️⃣ - 🚀 SOLICITAR TESTE GRÁTIS\n6️⃣ - 💳 PAGAR VIA PIX / RENOVAR\n7️⃣ - 📺 VER PLANOS E PREÇOS\n8️⃣ - 📝 LISTA DE CANAIS\n9️⃣ - 🎁 GANHE MESES GRÁTIS\n🔟 - 📖 TUTORIAL DE INSTALAÇÃO\n1️⃣1️⃣ - 📥 BAIXAR NOSSO APLICATIVO`;
 
         if (!usuariosSaudados.has(msgDe)) {
             usuariosSaudados.add(msgDe);
@@ -274,20 +289,20 @@ client.on('message_create', async (msg) => {
             await responderComDelay('⏳ *GERANDO SEU TESTE GRÁTIS...*');
             try {
                 const response = await axios.post(API_TESTE, {}, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-                
+
                 if (response.data.reply) {
                     await client.sendMessage(msg.from, response.data.reply);
-                    await client.sendMessage(msg.from, '✅ *Teste gerado com sucesso!* Você tem 3 horas para aproveitar o melhor conteúdo.\n\nAssista no celular, TV ou PC! 🚀');
+                    await client.sendMessage(msg.from, '✅ *Teste gerado com sucesso!* Você tem 1 hora para aproveitar o melhor conteúdo.\n\nAssista no celular, TV ou PC! 🚀');
 
                     // --- CONTADOR DE TESTE AUTOMÁTICO (REMARKETING) ---
-                    const tresHoras = 3 * 60 * 60 * 1000; 
+                    const umaHora = 1 * 60 * 60 * 1000;
 
                     setTimeout(async () => {
                         try {
-                            const mensagemPosTeste = `👋 Olá! Vi aqui que o seu teste de 3 horas já expirou.\n\n*Gostou da qualidade?*\n\nNão fique sem sinal! Digite *6* para escolher um plano e ativar o seu acesso VIP agora mesmo e ganhe mais 5 dias a mais Extras na sua assinatura! 💎`;
+                            const mensagemPosTeste = `👋 Olá! Vi aqui que o seu teste de 1 hora já expirou.\n\n*Gostou da qualidade?*\n\nNão fique sem sinal! Digite *6* para escolher um plano e ativar o seu acesso VIP agora mesmo e ganhe 5 dias a mais Extra na sua assinatura! 💎`;
                             await client.sendMessage(msg.from, mensagemPosTeste);
                         } catch (err) { console.error('Erro no contador:', err.message); }
-                    }, tresHoras);
+                    }, umaHora);
                 }
             } catch (e) { await msg.reply('❌ Sistema de testes em manutenção.'); }
         }
@@ -297,6 +312,13 @@ client.on('message_create', async (msg) => {
         else if (texto === '7') await responderComDelay(`📺 *NOSSOS PLANOS IPTV* 📺\n\nEscolha seu plano e digita (opção 6) para efetuar o pagamento.\n\n✅ *MENSAL:* R$ 25,00\n✅ *TRIMESTRAL:* R$ 60,00 (Economize R$ 15!)\n✅ *SEMESTRAL:* R$ 110,00\n\n🚀 +40.000 Conteúdos (4K, Full HD e HD)\n🎥 Filmes, Séries e Canais Adultos (Opcional)\n📱 Assista na Smart TV, Celular, TV Box ou PC.`);
         else if (texto === '8') await responderComDelay(`8️⃣ 📺 *NOSSA GRADE DE CONTEÚDO:*\n\n✅ Todos os canais de Esportes (Premiere, DAZN, ESPN)\n✅ Todos os canais de Filmes (HBO, Telecine, Max)\n✅ Canais Abertos e Fechados em 4K e Full HD\n✅ +30.000 Filmes e Séries (Netflix, Disney+, Globoplay)\n✅ Conteúdo Kids completo\n🔞 Canais Adultos (Opcional com senha)\n\n*Peça um teste grátis (opção 5) para ver a qualidade!*`);
         else if (texto === '9') await responderComDelay(`9️⃣ 🎁 *QUER GANHAR MENSALIDADE GRÁTIS?*\n\nIndique um amigo! Se ele assinar qualquer plano, você ganha *15 dias de bônus* na sua assinatura atual.\n\nQuanto mais indicar, mais tempo você assiste de graça! 🚀`);
+        else if (texto === '10') {
+            const guiaCliente = `📖 *COMO CONFIGURAR SEU ACESSO*\n\nPara instalar o nosso sistema no seu app, basta digitar o comando *!tutorial* que eu te envio o passo a passo agora mesmo! 📺`;
+            await responderComDelay(guiaCliente);
+        }
+        else if (texto === '11' || texto === 'app' || texto === 'baixar') {
+            await responderComDelay(`📲 *DOWNLOAD DO APLICATIVO LEO IPTV*\n\nClique no link abaixo para baixar o instalador oficial:\n\n🔗 ${LINK_APP}\n\n*Dica:* Após baixar, clique em "Instalar" e autorize "Fontes Desconhecidas" se o seu Android solicitar. 📺`);
+        }
         else if (texto === '!status') await msg.reply('✅ Bot Leo IPTV está Ativo!');
 
     } catch (error) { console.error('Erro:', error.message); }
