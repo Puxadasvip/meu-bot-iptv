@@ -33,7 +33,7 @@ function gerarCardVip(nome, vencimento, bonus = '') {
 // ================= CLIENT CONFIG (MODO NÚMERO) =================
 const client = new Client({
     authStrategy: new LocalAuth(),
-    authTimeoutMs: 90000, 
+    authTimeoutMs: 90000,
     puppeteer: {
         headless: true,
         executablePath: '/data/data/com.termux/files/usr/bin/chromium-browser',
@@ -44,7 +44,7 @@ const client = new Client({
             '--disable-gpu',
             '--no-zygote',
             '--single-process',
-            '--disable-extensions' 
+            '--disable-extensions'
         ]
     }
 });
@@ -126,8 +126,8 @@ client.on('message_create', async (msg) => {
         const clienteAtivo = db[msgDe];
         const ehDono = msg.fromMe;
 
-        // TRAVA DE SEGURANÇA: Bloqueia comandos para quem não pagou (Exceto ADM)
-        if (texto.startsWith('!') && !ehDono) {
+        // TRAVA DE SEGURANÇA CORRIGIDA: Bloqueia comandos EXCETO !planos para quem não pagou
+        if (texto.startsWith('!') && !ehDono && texto !== '!planos') {
             if (!clienteAtivo || clienteAtivo.vencimento < hojeIso) {
                 return msg.reply("⚠️ *ACESSO RESTRITO*\n\nSeu plano expirou ou você ainda não possui uma assinatura ativa.\n\nPara renovar ou assinar, digite *!planos*");
             }
@@ -135,7 +135,7 @@ client.on('message_create', async (msg) => {
 
         // COMANDO DE PLANOS (Aberto para todos consultarem)
         if (texto === '!planos') {
-            const mensagemPlanos = `🚀 *PLANOS LEO IPTV* 🚀\nEscolha o plano que melhor se adapta a você:\n\n🗓️ *DIÁRIO:* R$ 5,00 (24h de acesso)\n📅 *SEMANAL:* R$ 15,00 (7 dias)\n💳 *MENSAL:* R$ 30,00 (30 dias)\n🌟 *ANUAL:* R$ 200,00 (1 ano)\n\n📌 *Como contratar?*\nDigite *6* para ver os dados do Pix e envie o comprovante após o pagamento!`;
+            const mensagemPlanos = `🚀 *PLANOS LEO IPTV* 🚀\nEscolha o plano que melhor se adapta a você:\n\n🗓️ *DIÁRIO:* R$ 5,00 (24h de acesso)\n📅 *SEMANAL:* R$ 15,00 (7 dias)\n 💳 *MENSAL:* R$ 30,00 (30 dias)\n🌟 *ANUAL:* R$ 200,00 (1 ano)\n\n📌 *Como contratar?*\nDigite *6* para ver os dados do Pix e envie o comprovante após o pagamento!`;
             await msg.reply(mensagemPlanos);
             return;
         }
@@ -310,7 +310,7 @@ client.on('message_create', async (msg) => {
             });
         };
 
-        const MENU_PADRAO = `Olá! Bem-vindo ao suporte *Leo IPTV*. 🚀\nEscolha uma opção abaixo para continuar:\n\n1️⃣ -  🕗 Horário de funcionamento\n2️⃣ - 🤵🏻 Falar com o suporte (Leo)\n3️⃣ - 🏠 Ver o endereço da loja\n4️⃣ - 🔖 Cupom de desconto\n5️⃣ - 🚀 SOLICITAR TESTE GRÁTIS\n6️⃣ - 💳 PAGAR VIA PIX / RENOVAR\n7️⃣ - 📺 VER PLANOS E PREÇOS\n8️⃣ - 📝 LISTA DE CANAIS\n9️⃣ - 🎁 GANHE MESES GRÁTIS\n🔟 - 📖 TUTORIAL DE INSTALAÇÃO\n1️⃣1️⃣ - 📥 BAIXAR NOSSO APLICATIVO`;
+        const MENU_PADRAO = `Olá! Bem-vindo ao suporte *Leo IPTV*. 🚀\nSe Quiser Alugar Nosso Bot de Atendimentos Para O Seu Negocio Digita !PLANOS para continuar com seu atendimento escolha uma Das opcões abaixo:\n\n1️⃣ -  🕗 Horário de funcionamento\n2️⃣ - 🤵🏻 Falar com o suporte (Leo)\n3️⃣ - 🏠 Ver o endereço da loja\n4️⃣ - 🔖 Cupom de desconto\n5️⃣ - 🚀 SOLICITAR TESTE GRÁTIS\n6️⃣ - 💳 PAGAR VIA PIX / RENOVAR\n7️⃣ - 📺 VER PLANOS E PREÇOS\n8️⃣ - 📝 LISTA DE CANAIS\n9️⃣ - 🎁 GANHE MESES GRÁTIS\n🔟 - 📖 TUTORIAL DE INSTALAÇÃO\n1️⃣1️⃣ - 📥 BAIXAR NOSSO APLICATIVO`;
 
         if (!usuariosSaudados.has(msgDe)) {
             usuariosSaudados.add(msgDe);
