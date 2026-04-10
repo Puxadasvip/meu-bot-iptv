@@ -33,7 +33,7 @@ function gerarCardVip(nome, vencimento, bonus = '') {
 // ================= CLIENT CONFIG (MODO NÚMERO) =================
 const client = new Client({
     authStrategy: new LocalAuth(),
-    authTimeoutMs: 90000, // Aumenta o tempo de espera para 90 segundos
+    authTimeoutMs: 90000, 
     puppeteer: {
         headless: true,
         executablePath: '/data/data/com.termux/files/usr/bin/chromium-browser',
@@ -44,7 +44,7 @@ const client = new Client({
             '--disable-gpu',
             '--no-zygote',
             '--single-process',
-            '--disable-extensions' // Adicione esta linha
+            '--disable-extensions' 
         ]
     }
 });
@@ -55,8 +55,6 @@ client.on('qr', (qr) => {
     console.log('SCANEE O QR CODE ABAIXO AGORA:');
     console.log('DICA: Se não ler, tire um PRINT e mande para outro celular.');
     console.log('=============================================\n');
-    
-    // Deixamos o QR Code GRANDE (small: false) para a câmera focar melhor
     qrcode.generate(qr, {small: false});
 });
 
@@ -122,6 +120,27 @@ client.on('message_create', async (msg) => {
         const texto = msg.body ? msg.body.toLowerCase() : '';
         const msgDe = msg.from;
 
+        // ================= NOVAS FUNÇÕES DE ALUGUEL =================
+        const db = JSON.parse(fs.readFileSync(BANCO_DADOS));
+        const hojeIso = new Date().toISOString().split('T')[0];
+        const clienteAtivo = db[msgDe];
+        const ehDono = msg.fromMe;
+
+        // TRAVA DE SEGURANÇA: Bloqueia comandos para quem não pagou (Exceto ADM)
+        if (texto.startsWith('!') && !ehDono) {
+            if (!clienteAtivo || clienteAtivo.vencimento < hojeIso) {
+                return msg.reply("⚠️ *ACESSO RESTRITO*\n\nSeu plano expirou ou você ainda não possui uma assinatura ativa.\n\nPara renovar ou assinar, digite *!planos*");
+            }
+        }
+
+        // COMANDO DE PLANOS (Aberto para todos consultarem)
+        if (texto === '!planos') {
+            const mensagemPlanos = `🚀 *PLANOS LEO IPTV* 🚀\nEscolha o plano que melhor se adapta a você:\n\n🗓️ *DIÁRIO:* R$ 5,00 (24h de acesso)\n📅 *SEMANAL:* R$ 15,00 (7 dias)\n💳 *MENSAL:* R$ 30,00 (30 dias)\n🌟 *ANUAL:* R$ 200,00 (1 ano)\n\n📌 *Como contratar?*\nDigite *6* para ver os dados do Pix e envie o comprovante após o pagamento!`;
+            await msg.reply(mensagemPlanos);
+            return;
+        }
+        // ============================================================
+
         if (manutencaoAtiva && !msg.fromMe && !usuariosSaudados.has(msgDe)) {
             await msg.reply('⚠️ COMUNICADO LEO IPTV\n\nNosso servidor principal está em manutenção programada para melhorias. Previsão de retorno em 30-60 min. Agradecemos a paciência!');
             return;
@@ -143,7 +162,8 @@ client.on('message_create', async (msg) => {
                 `6️⃣ *!manutencao on/off* -> Aviso de queda.\n` +
                 `7️⃣ *!remover* -> Exclui cliente.\n` +
                 `8️⃣ *!pix* -> Minha chave pix.\n` +
-                `9️⃣ *!tutorial* -> Envia guia de instalação.`;
+                `9️⃣ *!tutorial* -> Envia guia de instalação.\n` +
+                `🔟 *!planos* -> Tabela de preços.`;
             await client.sendMessage(msg.from, menuAdm);
             return;
         }
@@ -164,8 +184,8 @@ client.on('message_create', async (msg) => {
         if (texto.startsWith('!aviso ')) {
             if (!msg.fromMe) return;
             const comunicado = msg.body.slice(7);
-            const db = JSON.parse(fs.readFileSync(BANCO_DADOS));
-            const clientes = Object.keys(db);
+            const dbAviso = JSON.parse(fs.readFileSync(BANCO_DADOS));
+            const clientes = Object.keys(dbAviso);
 
             if (clientes.length === 0) return msg.reply('❌ Nenhum cliente na base.');
 
@@ -183,8 +203,8 @@ client.on('message_create', async (msg) => {
 
         if (texto === '!caixa') {
             if (!msg.fromMe) return;
-            const db = JSON.parse(fs.readFileSync(BANCO_DADOS));
-            const IDs = Object.keys(db);
+            const dbCaixa = JSON.parse(fs.readFileSync(BANCO_DADOS));
+            const IDs = Object.keys(dbCaixa);
             const total = IDs.length;
             await msg.reply(`💰 *RELATÓRIO FINANCEIRO RÁPIDO*\n\n👥 Clientes na base: ${total}\n✅ Total estimado: R$ ${total * 25},00\n\n*(Cálculo baseado no plano mensal de R$ 25)*`);
             return;
@@ -204,7 +224,7 @@ client.on('message_create', async (msg) => {
             const dias = parseInt(partes[1]);
             if (isNaN(dias)) return;
 
-            const db = JSON.parse(fs.readFileSync(BANCO_DADOS));
+            const dbPago = JSON.parse(fs.readFileSync(BANCO_DADOS));
             const contatoAlvo = await chat.getContact();
             const nomeReal = contatoAlvo.pushname || 'Cliente';
 
@@ -212,74 +232,66 @@ client.on('message_create', async (msg) => {
             vencDate.setDate(vencDate.getDate() + dias);
             const vencFormatado = vencDate.toLocaleDateString('pt-BR');
 
-            db[msg.to] = { vencimento: vencDate.toISOString().split('T')[0], nome: nomeReal };
+            dbPago[msg.to] = { vencimento: vencDate.toISOString().split('T')[0], nome: nomeReal };
 
             let msgBonusTxt = '';
             if (partes[2]) {
                 const idIndicador = partes[2].replace('@', '') + '@c.us';
-                if (db[idIndicador]) {
-                    let dataBonus = new Date(db[idIndicador].vencimento + 'T00:00:00');
+                if (dbPago[idIndicador]) {
+                    let dataBonus = new Date(dbPago[idIndicador].vencimento + 'T00:00:00');
                     dataBonus.setDate(dataBonus.getDate() + 15);
-                    db[idIndicador].vencimento = dataBonus.toISOString().split('T')[0];
+                    dbPago[idIndicador].vencimento = dataBonus.toISOString().split('T')[0];
                     msgBonusTxt = `🎁 *BÔNUS:* 15 dias creditados ao indicador!`;
                 }
             }
 
-            fs.writeFileSync(BANCO_DADOS, JSON.stringify(db, null, 2));
+            fs.writeFileSync(BANCO_DADOS, JSON.stringify(dbPago, null, 2));
 
             const card = gerarCardVip(nomeReal, vencFormatado, msgBonusTxt);
             await client.sendMessage(msg.to, card);
             return;
         }
 
-                                if (texto === '!vencimentos') {
+        if (texto === '!vencimentos') {
             if (!msg.fromMe) return;
-            const db = JSON.parse(fs.readFileSync(BANCO_DADOS));
-            const hoje = new Date();
-            hoje.setHours(0, 0, 0, 0);
+            const dbVenc = JSON.parse(fs.readFileSync(BANCO_DADOS));
+            const hojeVenc = new Date();
+            hojeVenc.setHours(0, 0, 0, 0);
             let lista = '📊 *GESTÃO DE CLIENTES*\n\n';
-            const IDs = Object.keys(db);
-            
+            const IDs = Object.keys(dbVenc);
+
             if (IDs.length === 0) return msg.reply('❌ NENHUM CLIENTE CADASTRADO.');
 
             await msg.reply('⏳ *Processando lista, aguarde...*');
 
             for (const id of IDs) {
                 try {
-                    const cliente = db[id];
-                    const dataVenc = new Date(cliente.vencimento + 'T00:00:00');
-                    
-                    // Busca o contato real para pegar o número correto
+                    const clienteV = dbVenc[id];
+                    const dataVenc = new Date(clienteV.vencimento + 'T00:00:00');
                     const contatoInfo = await client.getContactById(id);
-                    const numeroReal = contatoInfo.number; // Pega o número limpo
-                    
-                    // Filtro: Se o número for muito longo ou estranho, a gente limpa
-                    if (numeroReal.length > 15) continue; 
+                    const numeroReal = contatoInfo.number;
 
-                    let status = (dataVenc < hoje) ? '🔴 VENCIDO' : (dataVenc.getTime() === hoje.getTime() ? '🟡 HOJE' : '🟢 ATIVO');
-                    
-                    lista += `👤 *Nome:* ${cliente.nome}\n`;
+                    if (numeroReal.length > 15) continue;
+
+                    let status = (dataVenc < hojeVenc) ? '🔴 VENCIDO' : (dataVenc.getTime() === hojeVenc.getTime() ? '🟡 HOJE' : '🟢 ATIVO');
+
+                    lista += `👤 *Nome:* ${clienteV.nome}\n`;
                     lista += `📱 *Número:* ${numeroReal}\n`;
                     lista += `📆 *Vencimento:* ${dataVenc.toLocaleDateString('pt-BR')}\n`;
                     lista += `📌 *Status:* ${status}\n`;
                     lista += `__________________________\n`;
-                } catch (e) {
-                    console.log(`Erro ao processar ID: ${id}`);
-                }
+                } catch (e) { console.log(`Erro ao processar ID: ${id}`); }
             }
-            
             await client.sendMessage(msg.from, lista);
             return;
         }
 
-
-
         if (texto === '!remover') {
             if (!msg.fromMe) return;
-            const db = JSON.parse(fs.readFileSync(BANCO_DADOS));
-            if (db[msg.to]) {
-                delete db[msg.to];
-                fs.writeFileSync(BANCO_DADOS, JSON.stringify(db, null, 2));
+            const dbRem = JSON.parse(fs.readFileSync(BANCO_DADOS));
+            if (dbRem[msg.to]) {
+                delete dbRem[msg.to];
+                fs.writeFileSync(BANCO_DADOS, JSON.stringify(dbRem, null, 2));
                 await msg.reply("🗑️ Cliente removido do sistema de avisos!");
             }
             return;
@@ -298,7 +310,7 @@ client.on('message_create', async (msg) => {
             });
         };
 
-        const MENU_PADRAO = `Olá! Bem-vindo ao suporte *Leo IPTV*. 🚀\nEscolha uma opção abaixo para continuar:\n\n1️⃣ - 🕗 Horário de funcionamento\n2️⃣ - 🤵🏻 Falar com o suporte (Leo)\n3️⃣ - 🏠 Ver o endereço da loja\n4️⃣ - 🔖 Cupom de desconto\n5️⃣ - 🚀 SOLICITAR TESTE GRÁTIS\n6️⃣ - 💳 PAGAR VIA PIX / RENOVAR\n7️⃣ - 📺 VER PLANOS E PREÇOS\n8️⃣ - 📝 LISTA DE CANAIS\n9️⃣ - 🎁 GANHE MESES GRÁTIS\n🔟 - 📖 TUTORIAL DE INSTALAÇÃO\n1️⃣1️⃣ - 📥 BAIXAR NOSSO APLICATIVO`;
+        const MENU_PADRAO = `Olá! Bem-vindo ao suporte *Leo IPTV*. 🚀\nEscolha uma opção abaixo para continuar:\n\n1️⃣ -  🕗 Horário de funcionamento\n2️⃣ - 🤵🏻 Falar com o suporte (Leo)\n3️⃣ - 🏠 Ver o endereço da loja\n4️⃣ - 🔖 Cupom de desconto\n5️⃣ - 🚀 SOLICITAR TESTE GRÁTIS\n6️⃣ - 💳 PAGAR VIA PIX / RENOVAR\n7️⃣ - 📺 VER PLANOS E PREÇOS\n8️⃣ - 📝 LISTA DE CANAIS\n9️⃣ - 🎁 GANHE MESES GRÁTIS\n🔟 - 📖 TUTORIAL DE INSTALAÇÃO\n1️⃣1️⃣ - 📥 BAIXAR NOSSO APLICATIVO`;
 
         if (!usuariosSaudados.has(msgDe)) {
             usuariosSaudados.add(msgDe);
@@ -309,39 +321,35 @@ client.on('message_create', async (msg) => {
         if (['menu', 'inicio', 'voltar'].includes(texto)) {
             await responderComDelay(MENU_PADRAO);
         }
-        else if (texto === '1') await responderComDelay('1️⃣ 🕒 Atendimento de Segunda a Sexta, das 08h às 23h. Sábados das 09h às 18h.');
+        else if (texto === '1') await responderComDelay('1️⃣  🕒 Atendimento de Segunda a Sexta, das 08h às 23h. Sábados das 09h às 18h.');
         else if (texto === '2') {
             await responderComDelay('2️⃣ 👨‍💻 Um momento! Já avisei o Leo. Ele falará com você em breve.');
             await client.sendMessage(seuNumero, `📢 *ALERTA:* O cliente ${contato.number} solicitou suporte.`);
         }
-        else if (texto === '3') await responderComDelay('3️⃣ 📍 Loja física: Rua Lazaro Gabriel De Oliveira, nº 1000, Osasco/SP.');
-        else if (texto === '4') await responderComDelay('4️⃣ 🎁 Use o cupom LEOIPTV10 e ganhe 10% de desconto!');
+        else if (texto === '3') await responderComDelay('3️⃣  📍 Loja física: Rua Lazaro Gabriel De Oliveira, nº 1000, Osasco/SP.');
+        else if (texto === '4') await responderComDelay('4️⃣  🎁 Use o cupom LEOIPTV10 e ganhe 10% de desconto!');
         else if (texto === '5' || texto === 'teste') {
             await responderComDelay('⏳ *GERANDO SEU TESTE GRÁTIS...*');
             try {
                 const response = await axios.post(API_TESTE, {}, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-
                 if (response.data.reply) {
                     await client.sendMessage(msg.from, response.data.reply);
                     await client.sendMessage(msg.from, '✅ *Teste gerado com sucesso!* Você tem 1 hora para aproveitar o melhor conteúdo.\n\nAssista no celular, TV ou PC! 🚀');
-
-                    const umaHora = 1 * 60 * 60 * 1000;
-
                     setTimeout(async () => {
                         try {
                             const mensagemPosTeste = `👋 Olá! Vi aqui que o seu teste de 1 hora já expirou.\n\n*Gostou da qualidade?*\n\nNão fique sem sinal! Digite *6* para escolher um plano e ativar o seu acesso VIP agora mesmo e ganhe 5 dias a mais Extra na sua assinatura! 💎`;
                             await client.sendMessage(msg.from, mensagemPosTeste);
                         } catch (err) { console.error('Erro no contador:', err.message); }
-                    }, umaHora);
+                    }, 3600000);
                 }
             } catch (e) { await msg.reply('❌ Sistema de testes em manutenção.'); }
         }
         else if (texto === '6' || texto === 'pix') {
-            await responderComDelay(`6️⃣ 💰 *PAGAMENTO VIA PIX*\n\n🔑 *CHAVE:* 35998632886\n👤 *NOME:* Jose Leandro Silva Cardoso\n🏦 *BANCO:* Itaú\n\n📸 *Envie o comprovante aqui para liberar seu acesso!*`);
+            await responderComDelay(`6️⃣ 💰 *PAGAMENTO VIA PIX*\n\n🔑 *CHAVE:* ${MINHA_CHAVE_PIX}\n👤 *NOME:* ${NOME_PIX}\n🏦 *BANCO:* Itaú\n\n📸 *Envie o comprovante aqui para liberar seu acesso!*`);
         }
         else if (texto === '7') await responderComDelay(`📺 *NOSSOS PLANOS IPTV* 📺\n\nEscolha seu plano e digita (opção 6) para efetuar o pagamento.\n\n✅ *MENSAL:* R$ 25,00\n✅ *TRIMESTRAL:* R$ 60,00 (Economize R$ 15!)\n✅ *SEMESTRAL:* R$ 110,00\n\n🚀 +40.000 Conteúdos (4K, Full HD e HD)\n🎥 Filmes, Séries e Canais Adultos (Opcional)\n📱 Assista na Smart TV, Celular, TV Box ou PC.`);
-        else if (texto === '8') await responderComDelay(`8️⃣ 📺 *NOSSA GRADE DE CONTEÚDO:*\n\n✅ Todos os canais de Esportes (Premiere, DAZN, ESPN)\n✅ Todos os canais de Filmes (HBO, Telecine, Max)\n✅ Canais Abertos e Fechados em 4K e Full HD\n✅ +30.000 Filmes e Séries (Netflix, Disney+, Globoplay)\n✅ Conteúdo Kids completo\n🔞 Canais Adultos (Opcional com senha)\n\n*Peça um teste grátis (opção 5) para ver a qualidade!*`);
-        else if (texto === '9') await responderComDelay(`9️⃣ 🎁 *QUER GANHAR MENSALIDADE GRÁTIS?*\n\nIndique um amigo! Se ele assinar qualquer plano, você ganha *15 dias de bônus* na sua assinatura atual.\n\nQuanto mais indicar, mais tempo você assiste de graça! 🚀`);
+        else if (texto === '8') await responderComDelay(`8️⃣  📺 *NOSSA GRADE DE CONTEÚDO:*\n\n✅ Todos os canais de Esportes (Premiere, DAZN, ESPN)\n✅ Todos os canais de Filmes (HBO, Telecine, Max)\n✅ Canais Abertos e Fechados em 4K e Full HD\n✅ +30.000 Filmes e Séries (Netflix, Disney+, Globoplay)\n✅ Conteúdo Kids completo\n🔞 Canais Adultos (Opcional com senha)\n\n*Peça um teste grátis (opção 5) para ver a qualidade!*`);
+        else if (texto === '9') await responderComDelay(`9️⃣  🎁 *QUER GANHAR MENSALIDADE GRÁTIS?*\n\nIndique um amigo! Se ele assinar qualquer plano, você ganha *15 dias de bônus* na sua assinatura atual.\n\nQuanto mais indicar, mais tempo você assiste de graça! 🚀`);
         else if (texto === '10') {
             const guiaCliente = `📖 *COMO CONFIGURAR SEU ACESSO*\n\nPara instalar o nosso sistema no seu app, basta digitar o comando *!tutorial* que eu te envio o passo a passo agora mesmo! 📺`;
             await responderComDelay(guiaCliente);
