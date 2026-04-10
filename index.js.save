@@ -4,12 +4,12 @@ const axios = require('axios');
 const fs = require('fs');
 
 // ================= CONFIGURAÇÃO =================
-const seuNumero = '5511925410635@c.us';
+const seuNumero = '553598632886@c.us';
 const API_TESTE = 'https://atmos.panelbr.site/api/chatbot/VdWXYPj13q/VpKDaPJLRA';
 const MINHA_CHAVE_PIX = '35998632886';
 const NOME_PIX = 'Jose Leandro Silva Cardoso';
 const BANCO_DADOS = './clientes.json';
-const LINK_APP = 'https://xciptv.br.uptodown.com/android/download';
+const LINK_APP = 'https://xciptv.br.uptodown.com/android/download'; // <--- INSIRA O LINK DO SEU APP AQUI
 
 let manutencaoAtiva = false;
 
@@ -19,6 +19,7 @@ if (!fs.existsSync(BANCO_DADOS)) {
 
 const usuariosSaudados = new Set();
 
+// --- Card de Texto ---
 function gerarCardVip(nome, vencimento, bonus = '') {
     return `✨ *COMPROVANTE DE ACESSO VIP* ✨\n\n` +
            `👤 *CLIENTE:* ${nome.toUpperCase()}\n` +
@@ -29,35 +30,18 @@ function gerarCardVip(nome, vencimento, bonus = '') {
            `_________________________________\n` +
            `*Obrigado pela confiança! Boa diversão!*`;
 }
+// ================================================
 
-// ================= CLIENT CONFIG (MODO NÚMERO) =================
+// Adicione isso onde você configura o Client
 const client = new Client({
     authStrategy: new LocalAuth(),
-    authTimeoutMs: 90000, // Aumenta o tempo de espera para 90 segundos
-    puppeteer: {
-        headless: true,
-        executablePath: '/data/data/com.termux/files/usr/bin/chromium-browser',
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-gpu',
-            '--no-zygote',
-            '--single-process',
-            '--disable-extensions' // Adicione esta linha
-        ]
-    }
+    pairingCode: true, // Adicione essa linha
+    puppeteer: { ... }
 });
 
-
 client.on('qr', (qr) => {
-    console.log('\n=============================================');
-    console.log('SCANEE O QR CODE ABAIXO AGORA:');
-    console.log('DICA: Se não ler, tire um PRINT e mande para outro celular.');
-    console.log('=============================================\n');
-    
-    // Deixamos o QR Code GRANDE (small: false) para a câmera focar melhor
-    qrcode.generate(qr, {small: false});
+    // Se quiser o código de emparelhamento em vez do QR
+    console.log("Acesse o WhatsApp > Aparelhos Conectados > Conectar com número de telefone");
 });
 
 
@@ -232,47 +216,24 @@ client.on('message_create', async (msg) => {
             return;
         }
 
-                                if (texto === '!vencimentos') {
+        if (texto === '!vencimentos') {
             if (!msg.fromMe) return;
             const db = JSON.parse(fs.readFileSync(BANCO_DADOS));
             const hoje = new Date();
             hoje.setHours(0, 0, 0, 0);
             let lista = '📊 *GESTÃO DE CLIENTES*\n\n';
             const IDs = Object.keys(db);
-            
-            if (IDs.length === 0) return msg.reply('❌ NENHUM CLIENTE CADASTRADO.');
+            if (IDs.length === 0) return msg.reply('❌ Vazio.');
 
-            await msg.reply('⏳ *Processando lista, aguarde...*');
-
-            for (const id of IDs) {
-                try {
-                    const cliente = db[id];
-                    const dataVenc = new Date(cliente.vencimento + 'T00:00:00');
-                    
-                    // Busca o contato real para pegar o número correto
-                    const contatoInfo = await client.getContactById(id);
-                    const numeroReal = contatoInfo.number; // Pega o número limpo
-                    
-                    // Filtro: Se o número for muito longo ou estranho, a gente limpa
-                    if (numeroReal.length > 15) continue; 
-
-                    let status = (dataVenc < hoje) ? '🔴 VENCIDO' : (dataVenc.getTime() === hoje.getTime() ? '🟡 HOJE' : '🟢 ATIVO');
-                    
-                    lista += `👤 *Nome:* ${cliente.nome}\n`;
-                    lista += `📱 *Número:* ${numeroReal}\n`;
-                    lista += `📆 *Vencimento:* ${dataVenc.toLocaleDateString('pt-BR')}\n`;
-                    lista += `📌 *Status:* ${status}\n`;
-                    lista += `__________________________\n`;
-                } catch (e) {
-                    console.log(`Erro ao processar ID: ${id}`);
-                }
-            }
-            
+            IDs.forEach(id => {
+                const cliente = db[id];
+                const dataVenc = new Date(cliente.vencimento + 'T00:00:00');
+                let status = (dataVenc < hoje) ? '🔴 VENCIDO' : (dataVenc.getTime() === hoje.getTime() ? '🟡 HOJE' : '🟢 ATIVO');
+                lista += `👤 ${cliente.nome}\n📱 ${id.split('@')[0]}\n📆 ${dataVenc.toLocaleDateString('pt-BR')}\n📌 ${status}\n---\n`;
+            });
             await client.sendMessage(msg.from, lista);
             return;
         }
-
-
 
         if (texto === '!remover') {
             if (!msg.fromMe) return;
@@ -314,8 +275,7 @@ client.on('message_create', async (msg) => {
             await responderComDelay('2️⃣ 👨‍💻 Um momento! Já avisei o Leo. Ele falará com você em breve.');
             await client.sendMessage(seuNumero, `📢 *ALERTA:* O cliente ${contato.number} solicitou suporte.`);
         }
-        else if (texto === '3') await responderComDelay('3️⃣ 📍 Loja física: Rua Lazaro Gabriel De Oliveira, nº 1000, Osasco/SP.');
-        else if (texto === '4') await responderComDelay('4️⃣ 🎁 Use o cupom LEOIPTV10 e ganhe 10% de desconto!');
+        else if (texto === '3') await responderComDelay('3️⃣ 📍 Loja física: Rua Lazaro Gabriel De Oliveira, nº 1000, Osasco/SP.'        else if (texto === '4') await responderComDelay('4️⃣ 🎁 Use o cupom LEOIPTV10 e ganhe 10% de desconto!'
         else if (texto === '5' || texto === 'teste') {
             await responderComDelay('⏳ *GERANDO SEU TESTE GRÁTIS...*');
             try {
@@ -343,15 +303,4 @@ client.on('message_create', async (msg) => {
         else if (texto === '8') await responderComDelay(`8️⃣ 📺 *NOSSA GRADE DE CONTEÚDO:*\n\n✅ Todos os canais de Esportes (Premiere, DAZN, ESPN)\n✅ Todos os canais de Filmes (HBO, Telecine, Max)\n✅ Canais Abertos e Fechados em 4K e Full HD\n✅ +30.000 Filmes e Séries (Netflix, Disney+, Globoplay)\n✅ Conteúdo Kids completo\n🔞 Canais Adultos (Opcional com senha)\n\n*Peça um teste grátis (opção 5) para ver a qualidade!*`);
         else if (texto === '9') await responderComDelay(`9️⃣ 🎁 *QUER GANHAR MENSALIDADE GRÁTIS?*\n\nIndique um amigo! Se ele assinar qualquer plano, você ganha *15 dias de bônus* na sua assinatura atual.\n\nQuanto mais indicar, mais tempo você assiste de graça! 🚀`);
         else if (texto === '10') {
-            const guiaCliente = `📖 *COMO CONFIGURAR SEU ACESSO*\n\nPara instalar o nosso sistema no seu app, basta digitar o comando *!tutorial* que eu te envio o passo a passo agora mesmo! 📺`;
-            await responderComDelay(guiaCliente);
-        }
-        else if (texto === '11' || texto === 'app' || texto === 'baixar') {
-            await responderComDelay(`📲 *DOWNLOAD DO APLICATIVO LEO IPTV*\n\nClique no link abaixo para baixar o instalador oficial:\n\n🔗 ${LINK_APP}\n\n*Dica:* Após baixar, clique em "Instalar" e autorize "Fontes Desconhecidas" se o seu Android solicitar. 📺`);
-        }
-        else if (texto === '!status') await msg.reply('✅ Bot Leo IPTV está Ativo!');
-
-    } catch (error) { console.error('Erro:', error.message); }
-});
-
-client.initialize();
+            const guiaCliente = `📖 *COMO CONFIGURAR SEU ACESSO*\n\nPara instalar o nosso sistema no seu app, basta digitar o comando *!tutorial* que eu te envio o passo a passo 
