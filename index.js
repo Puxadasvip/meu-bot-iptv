@@ -19,15 +19,18 @@ if (!fs.existsSync(BANCO_DADOS)) {
 
 const usuariosSaudados = new Set();
 
+// NOVA FUNÇÃO DE CARD VISUAL TURBINADA
 function gerarCardVip(nome, vencimento, bonus = '') {
-    return `✨ *COMPROVANTE DE ACESSO VIP* ✨\n\n` +
-           `👤 *CLIENTE:* ${nome.toUpperCase()}\n` +
-           `📆 *VENCIMENTO:* ${vencimento}\n` +
-           `🚀 *STATUS:* Ativado com Sucesso\n` +
-           `${bonus}\n` +
-           `📺 *LEO IPTV - O MELHOR DO STREAMING*\n` +
-           `_________________________________\n` +
-           `*Obrigado pela confiança! Boa diversão!*`;
+    return `💳 *CARTÃO DE ACESSO LEO IPTV* 💳\n` +
+           `________________________________\n\n` +
+           `👤 *TITULAR:* ${nome.toUpperCase()}\n` +
+           `📅 *EXPIRA EM:* ${vencimento}\n` +
+           `✅ *STATUS:* ASSINATURA ATIVA\n` +
+           `🛰️ *SERVIDOR:* PREMIUM HIGH SPEED\n` +
+           `${bonus ? '\n🎁 *BÔNUS:* ' + bonus : ''}\n` +
+           `________________________________\n` +
+           `📌 *DICA:* Digite *!meuplano* para consultar.\n` +
+           `📺 *Obrigado por escolher a LEO IPTV!*`;
 }
 
 // ================= CLIENT CONFIG (MODO NÚMERO) =================
@@ -126,40 +129,52 @@ client.on('message_create', async (msg) => {
         const clienteAtivo = db[msgDe];
         const ehDono = msg.fromMe;
 
-        // TRAVA DE SEGURANÇA CORRIGIDA: Bloqueia comandos EXCETO !planos e !meuplano
+        // TRAVA DE SEGURANÇA: Bloqueia comandos EXCETO !planos e !meuplano
         if (texto.startsWith('!') && !ehDono && texto !== '!planos' && texto !== '!meuplano') {
             if (!clienteAtivo || clienteAtivo.vencimento < hojeIso) {
                 return msg.reply("⚠️ *ACESSO RESTRITO*\n\nSeu plano expirou ou você ainda não possui uma assinatura ativa.\n\nPara renovar ou assinar, digite *!planos*");
             }
         }
 
-        // COMANDO DE PLANOS (Aberto para todos consultarem)
+        // COMANDO DE PLANOS
         if (texto === '!planos') {
             const mensagemPlanos = `🚀 *PLANOS LEO IPTV* 🚀\nEscolha o plano que melhor se adapta a você:\n\n🗓️ *DIÁRIO:* R$ 5,00 (24h de acesso)\n📅 *SEMANAL:* R$ 15,00 (7 dias)\n 💳 *MENSAL:* R$ 30,00 (30 dias)\n🌟 *ANUAL:* R$ 200,00 (1 ano)\n\n📌 *Como contratar?*\nDigite *6* para ver os dados do Pix e envie o comprovante após o pagamento!`;
             await msg.reply(mensagemPlanos);
             return;
         }
 
-        // COMANDO MEU PLANO (Para o cliente consultar sozinho)
+        // NOVO COMANDO MEU PLANO COM BARRA DE PROGRESSO VISUAL
         if (texto === '!meuplano') {
             if (!clienteAtivo) {
                 return msg.reply("❌ Você ainda não possui um plano cadastrado em nosso sistema.");
             }
-            
+
             const hoje = new Date();
             hoje.setHours(0,0,0,0);
             const venc = new Date(clienteAtivo.vencimento + 'T00:00:00');
             const diffDias = Math.ceil((venc - hoje) / (1000 * 60 * 60 * 24));
             const dataFmt = venc.toLocaleDateString('pt-BR');
 
-            let respostaPlano = `👤 *CLIENTE:* ${clienteAtivo.nome}\n📆 *VENCIMENTO:* ${dataFmt}\n`;
-            
+            // Gerador de barra visual
+            let barra = "";
+            if (diffDias >= 25) barra = "██████████ 100%";
+            else if (diffDias >= 20) barra = "████████░░ 80%";
+            else if (diffDias >= 15) barra = "██████░░░░ 60%";
+            else if (diffDias >= 10) barra = "████░░░░░░ 40%";
+            else if (diffDias >= 5)  barra = "██░░░░░░░░ 20%";
+            else barra = "█░░░░░░░░░ 5%";
+
+            let respostaPlano = `✨ *STATUS DO SEU ACESSO* ✨\n\n`;
+            respostaPlano += `👤 *CLIENTE:* ${clienteAtivo.nome}\n`;
+            respostaPlano += `📆 *VENCIMENTO:* ${dataFmt}\n`;
+            respostaPlano += `⏳ *TEMPO RESTANTE:* ${diffDias > 0 ? diffDias + ' dias' : 'Expirado'}\n\n`;
+
             if (diffDias > 0) {
-                respostaPlano += `🚀 *STATUS:* Ativo\n⏳ *FALTAM:* ${diffDias} dias`;
+                respostaPlano += `📊 *CONSUMO:* \n[${barra}]\n\n✅ Seu sinal está operando normalmente.`;
             } else if (diffDias === 0) {
                 respostaPlano += `🟡 *STATUS:* Vence Hoje!\n⚠️ Renove para não perder o sinal.`;
             } else {
-                respostaPlano += `🔴 *STATUS:* Vencido\n❌ Seu acesso está bloqueado.`;
+                respostaPlano += `🔴 *STATUS:* Vencido\n❌ Seu acesso está bloqueado. Digite *!planos* para renovar!`;
             }
 
             await msg.reply(respostaPlano);
@@ -273,6 +288,7 @@ client.on('message_create', async (msg) => {
 
             fs.writeFileSync(BANCO_DADOS, JSON.stringify(dbPago, null, 2));
 
+            // Chamada do novo card VIP visual
             const card = gerarCardVip(nomeReal, vencFormatado, msgBonusTxt);
             await client.sendMessage(msg.to, card);
             return;
